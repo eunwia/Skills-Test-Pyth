@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h3>Generate Report | <a href="/">Back to Menu</a></h3>
+
+<h4>Report By Campus</h4>
+<table class="w3-table-all">
+  <tr class="w3-blue"><th>Campus</th><th>Count</th><th>Attended</th></tr>
+  {% for c in campus_summary %}
+  <tr><td>{{ c.studcam }}</td><td>{{ c.count }}</td><td>{{ c.attended }}</td></tr>
+  {% endfor %}
+  <tr class="w3-light-grey"><td><b>Total</b></td><td><b>{{ total_count }}</b></td><td><b>{{ total_attended }}</b></td></tr>
+</table>
+
+<h4>Detailed Table</h4>
+<table class="w3-table-all">
+  <tr class="w3-blue"><th>ID</th><th>Name</th><th>Campus</th><th>Attended</th></tr>
+  {% for s in students %}
+  <tr>
+    <td>{{ s.studnum }}</td>
+    <td>{{ s.studLname }}, {{ s.studFname }}</td>
+    <td>{{ s.studcam }}</td>
+    <td>{{ s.attended }}</td>
+  </tr>
+  {% endfor %}
+</table>
+
+<h4>Summary Report (All Campuses)</h4>
+<table class="w3-table-all">
+  <tr><td>Total Students</td><td>{{ total_count }}</td></tr>
+  <tr><td>Total Collection</td><td>{{ "%.2f"|format(total_collection) }}</td></tr>
+  <tr><td>Date Generated</td><td>{{ today }}</td></tr>
+</table>
+
+{% endblock %}

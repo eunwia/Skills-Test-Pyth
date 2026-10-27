@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h3>Let's have the UC ICT Congress Raffle | <a href="/">Back to Menu</a></h3>
+
+<div class="w3-card w3-white w3-padding-32 w3-center">
+  <form action="/raffle" method="post">
+    <button class="w3-btn w3-blue w3-large">Reveal the Lucky Winner!</button>
+  </form>
+
+  {% if winner %}
+  <table class="w3-table w3-bordered w3-margin-top" style="margin:auto">
+    <tr class="w3-blue"><th>ID#</th><th>Name</th><th>Campus</th></tr>
+    <tr>
+      <td>{{ winner.studnum }}</td>
+      <td>{{ winner.studLname }}, {{ winner.studFname }}</td>
+      <td>{{ winner.studcam }}</td>
+    </tr>
+  </table>
+  <h2 class="w3-text-green">CONGRATULATIONS!!!</h2>
+  {% endif %}
+</div>
+
+{% endblock %}

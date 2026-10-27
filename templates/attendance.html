@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h3>Take Attendance Here | <a href="/">Back to Menu</a></h3>
+
+{% if msg %}
+<div class="w3-panel w3-pale-yellow w3-leftbar w3-border-yellow">{{ msg }}</div>
+{% endif %}
+
+<div class="w3-card w3-white w3-padding-16 w3-margin-bottom">
+  <form action="/attendance/check" method="post">
+    <input class="w3-input w3-border" name="studnum" placeholder="Enter Student ID" required>
+    <br><br>
+    <button class="w3-btn w3-blue">Check</button>
+  </form>
+</div>
+
+<table class="w3-table-all">
+  <tr class="w3-blue">
+    <th>ID</th><th>Name</th><th>Campus</th><th>Attended?</th><th>Action</th>
+  </tr>
+  {% for s in students %}
+  <tr>
+    <td>{{ s.studnum }}</td>
+    <td>{{ s.studLname }}, {{ s.studFname }}</td>
+    <td>{{ s.studcam }}</td>
+    <td>{{ s.attended }}</td>
+    <td>
+      <form action="/attendance/submit" method="post">
+        <input type="hidden" name="studnum" value="{{ s.studnum }}">
+        <button name="attended" value="Yes" class="w3-btn w3-small w3-green">Yes</button>
+        <button name="attended" value="No" class="w3-btn w3-small w3-grey">No</button>
+      </form>
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+
+{% endblock %}

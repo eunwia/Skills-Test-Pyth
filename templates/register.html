@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h3>Register a Student Here | <a href="/">Back to Menu</a></h3>
+
+<div class="w3-card w3-white w3-padding-16 w3-margin-bottom">
+  <form action="/register/add" method="post">
+    <input type="hidden" name="old_studnum" value="{{ edit.studnum if edit else '' }}">
+    <div class="w3-row-padding">
+      <div class="w3-col m2"><input class="w3-input w3-border" name="studnum" placeholder="ID" value="{{ edit.studnum if edit else '' }}" required></div>
+      <div class="w3-col m2"><input class="w3-input w3-border" name="studFname" placeholder="First Name" value="{{ edit.studFname if edit else '' }}" required></div>
+      <div class="w3-col m2"><input class="w3-input w3-border" name="studLname" placeholder="Last Name" value="{{ edit.studLname if edit else '' }}" required></div>
+      <div class="w3-col m2"><input class="w3-input w3-border" name="studcam" placeholder="Campus" value="{{ edit.studcam if edit else '' }}" required></div>
+      <div class="w3-col m2"><input class="w3-input w3-border" name="amountPaid" placeholder="Amount" value="{{ edit.amountPaid if edit else '' }}" required></div>
+      <div class="w3-col m2"><button class="w3-btn w3-blue w3-block">{{ 'Update' if edit else 'Add' }}</button></div>
+    </div>
+  </form>
+</div>
+
+<table class="w3-table-all">
+  <tr class="w3-blue">
+    <th>ID</th><th>Name</th><th>Campus</th><th>Amount</th><th>Action</th>
+  </tr>
+  {% for s in students %}
+  <tr>
+    <td>{{ s.studnum }}</td>
+    <td>{{ s.studLname }}, {{ s.studFname }}</td>
+    <td>{{ s.studcam }}</td>
+    <td>{{ "%.2f"|format(s.amountPaid) }}</td>
+    <td>
+      <a href="/register/edit/{{ s.studnum }}" class="w3-btn w3-small w3-yellow">Edit</a>
+      <a href="/register/delete/{{ s.studnum }}" class="w3-btn w3-small w3-red">Delete</a>
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+
+{% endblock %}

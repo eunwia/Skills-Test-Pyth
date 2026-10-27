@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h3>Check My Campus | <a href="/">Back to Menu</a></h3>
+
+<div class="w3-card w3-white w3-padding-16 w3-margin-bottom">
+  <form action="/campus" method="post">
+    <input class="w3-input w3-border" name="studnum" placeholder="Enter Student ID" required>
+    <br><br>
+    <button class="w3-btn w3-blue">Check</button>
+  </form>
+</div>
+
+{% if result %}
+<div class="w3-panel w3-pale-green w3-leftbar w3-border-green">
+  {{ result.studFname }} {{ result.studLname }} is from <b>{{ result.studcam }}</b> campus.
+</div>
+{% elif searched %}
+<div class="w3-panel w3-pale-red w3-leftbar w3-border-red">ID NOT FOUND</div>
+{% endif %}
+
+{% endblock %}

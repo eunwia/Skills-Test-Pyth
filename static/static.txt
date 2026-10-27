@@ -1,0 +1,506 @@
+# style.css --------------------------------
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+
+:root{
+    --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+body{
+    font-family: var(--font-sans);
+}
+
+h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-sans) !important;
+}
+
+# dbhelper.py --------------------------------
+from sqlite3 import Row, connect
+database='db/montallana.db'
+
+def getprocess(sql,vals)->list:
+    print(sql)
+    conn=connect(database)
+    conn.row_factory=Row
+    cursor=conn.cursor()
+    cursor.execute(sql,vals)
+    data=cursor.fetchall()
+    return data
+
+def postprocess(sql,vals)->bool:
+    print(sql)
+    try:
+        conn=connect(database)
+        cursor=conn.cursor()
+        cursor.execute(sql,vals)
+        conn.commit()
+    except Exception as e:
+        print(f"ERROR : {e}")
+    finally:
+        cursor.close()
+        conn.close()
+    return True if cursor.rowcount>0 else False
+
+def getall(table)->list:
+    sql=f"SELECT * FROM `{table}`"
+    return getprocess(sql,[])
+
+def getrecord(table,**kwargs)->list:
+    keys=list(kwargs.keys())
+    vals=list(kwargs.values())
+    fields=[]
+    for key in keys:
+        fields.append(f"`{key}`=?")
+    flds=" AND ".join(fields)
+    sql=f"SELECT * FROM `{table}` WHERE {flds}"
+    return getprocess(sql,vals)
+
+def addrecord(table,**kwargs)->bool:
+    keys=list(kwargs.keys())
+    vals=list(kwargs.values())
+    fields="`,`".join(keys)
+    qmark=['?']*len(vals)
+    data=",".join(qmark)
+    sql=f"INSERT INTO `{table}`(`{fields}`) VALUES ({data})"
+    return postprocess(sql,vals)
+
+def deleterecord(table,**kwargs)->bool:
+    keys=list(kwargs.keys())
+    vals=list(kwargs.values())
+    fields=[]
+    for key in keys:
+        fields.append(f"`{key}`=?")
+    flds=" AND ".join(fields)
+    sql=f"DELETE FROM `{table}` WHERE {flds}"
+    return postprocess(sql,vals)
+
+def updaterecord(table,**kwargs)->bool:
+    keys=list(kwargs.keys())
+    vals=list(kwargs.values())
+    newvals=[]
+    fields=[]
+    for index in range(1,len(keys)):
+        fields.append(f"`{keys[index]}`=?")
+        newvals.append(f"{vals[index]}")
+    flds=",".join(fields)
+    sql=f"UPDATE `{table}` SET {flds} WHERE `{keys[0]}`='{vals[0]}'"
+    return postprocess(sql,newvals)
+    
+# app.py --------------------------------
+
+import sys
+sys.path.insert(0,'db/montallana.db')
+from flask import Flask, render_template, request,redirect
+from db.dbhelper import *
+import random
+from datetime import date
+
+app=Flask(__name__)
+TABLE = 'Registration'
+
+@app.route('/')
+def menu():
+    return render_template('menu.html')
+
+@app.route('/go')
+def go():
+    page = request.args.get('page')
+    return redirect('/' + page)
+
+@app.route('/register')
+def register():
+    students = getall(TABLE)
+    return render_template('register.html', students=students, edit=None)
+
+@app.route('/register/add', methods=['POST'])
+def register_add():
+    old_studnum = request.form.get('old_studnum')
+    data = {
+        'studnum': request.form['studnum'],
+        'studcam': request.form['studcam'],
+        'studFname': request.form['studFname'],
+        'studLname': request.form['studLname'],
+        'amountPaid': request.form['amountPaid'],
+    }
+    if old_studnum:
+        updaterecord(TABLE,
+                     studnum=old_studnum,
+                     studcam=data['studcam'],
+                     studFname=data['studFname'],
+                     studLname=data['studLname'],
+                     amountPaid=data['amountPaid']
+                     )
+    else:
+        data['attended']='No'
+        addrecord(TABLE,**data)
+    return redirect('/register')
+
+@app.route('/register/edit/<studnum>')
+def register_edit(studnum):
+    students = getall(TABLE)
+    edit = getrecord(TABLE, studnum=studnum)[0]
+    return render_template('register.html', students=students, edit=edit)
+
+@app.route('/register/delete/<studnum>')
+def register_delete(studnum):
+    deleterecord(TABLE, studnum=studnum)
+    return redirect('/register')
+
+@app.route('/attendance')
+def attendance():
+    students = getall(TABLE)
+    return render_template('attendance.html', students=students, edit=None)
+
+@app.route('/attendance/check', methods=['POST'])
+def attendance_check():
+    studnum = request.form['studnum']
+    found = getrecord(TABLE, studnum=studnum)
+    students = getall(TABLE)
+    if not found:
+        msg = "NOT YET REGISTERED"
+    elif found[0]['attended'] == 'Yes':
+        msg = "ALREADY ATTENDED"
+    else:
+        msg = "Students found. Click Yes/No below to record attendance."
+    return render_template('attendance.html',students=students, msg=msg)
+
+@app.route('/attendance/submit', methods=['POST'])
+def attendance_submit():
+    studnum = request.form['studnum']
+    attended = request.form['attended']
+    found = getrecord(TABLE, studnum=studnum)[0]
+    if found['attended'] == 'Yes':
+        msg = "ALREADY EXISTS. This will not update student's attendance record."
+    else:
+        updaterecord(TABLE, studnum=studnum, attended=attended)
+        msg = "SUCCESSFULLY RECORDED"
+    students = getall(TABLE)
+    return render_template('attendance.html', students=students, msg=msg)
+
+@app.route('/raffle', methods=['GET', 'POST'])
+def raffle():
+    winner=None
+    if request.method=='POST':
+        students=getall(TABLE)
+        winner=random.choice(students) if students else None
+    return render_template('raffle.html', winner=winner)
+
+@app.route('/campus', methods=['GET', 'POST'])
+def campus():
+    result, searched = None, False
+    if request.method =='POST':
+        searched=True
+        studnum=request.form['studnum']
+        found=getrecord(TABLE, studnum=studnum)
+        result=found[0] if found else None
+    return render_template('campus.html', result=result, searched=searched)
+
+@app.route('/report')
+def report():
+    students = getall(TABLE)
+
+    campuses = sorted(set(s['studcam'] for s in students))
+    campus_summary=[]
+    for c in campuses:
+        members=[s for s in students if s['studcam'] == c]
+        attended = len ([s for s in members if s['attended'] == 'Yes'])
+        campus_summary.append({'studcam':c, 'count': len(members), 'attended':attended})
+    total_count = len(students)
+    total_attended = len([s for s in students if s['attended'] == 'Yes'])
+    total_collection = sum(s['amountPaid'] for s in students)
+
+    return render_template('report.html', students=students, campus_summary=campus_summary,total_count=total_count, total_attended=total_attended,
+                            total_collection=total_collection,today=date.today().strftime('%m/%d/%Y'))
+
+if __name__=="__main__":
+    app.run(debug=True)
+
+# base.html --------------------------------
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>UC ICT CONGRESS</title>
+        <link rel="stylesheet" href="{{ url_for('static',filename='css/w3.css') }}">
+        <link rel="stylesheet" href="{{ url_for('static',filename='css/style.css') }}">
+    </head>
+    <body>
+        <div class="w3-bar w3-indigo w3-padding w3-bold">
+            <span class="w3-bar-item">University of Cebu</span>
+        </div>
+        <div class="w3-container w3-padding">
+            {% block content %}
+            {% endblock %}
+        </div>
+        <center>
+            <footer class="w3-bottom">Montallana - Skillstest 2026</footer>
+        </center>
+    </body>
+</html>
+
+# menu.html --------------------------------
+{% extends 'base.html' %}
+{% block content %}
+<center> 
+<br><br><br>
+<div class="w3-card w3-round-large w3-indigo" style="width:600px; height:370px;">
+    <form action="/go" method="get">
+        <br><br>
+        <p class="w3-badge w3-white w3-bold w3-text-indigo">UC</p>
+        <h1 class="w3-text-white w3-bold">ICT CONGRESS SYSTEM</h1>
+        <p class="w3-small">select your option...</p>
+        <select name="page" class="w3-select w3-padding w3-indigo" style="width:250px;">
+            <option value="register">Register</option>
+            <option value="attendance">Attendance</option>
+            <option value="raffle">Raffle</option>
+            <option value="campus">Check My Campus</option>
+            <option value="report">Generate Report</option>
+        </select>
+        <br><br>
+        <button class="w3-btn w3-white w3-round-large w3-text-indigo w3-bold" style="width:150px;">GO</button>
+    </form>
+</div>
+<br><br><br>
+</center>
+{% endblock %}
+
+# register.html --------------------------------
+{% extends 'base.html' %}
+{% block content %}
+<div>
+    <form action="/" method="get">
+        <button class="w3-btn w3-right w3-margin w3-bold w3-text-indigo">| Back to Menu</button>
+    </form>
+    <h1 class="w3-padding w3-bold w3-text-indigo">Register Students</h1>
+    <div class="w3-card w3-indigo w3-round-large w3-padding w3-margin">
+        <form action="/register/add" method="post">
+            <input type="hidden" name="old_studnum" value="{{ edit.studnum if edit else '' }}" required>
+            <div class="w3-row-padding">
+                <div class="w3-col m2">
+                    <input name="studnum" class="w3-select w3-border w3-round-large w3-padding" placeholder="ID" value="{{ edit.studnum if edit else '' }}" required?>
+                </div>
+                <div class="w3-col m2">
+                    <input name="studFname" class="w3-select w3-border w3-round-large w3-padding" placeholder="First Name" value="{{ edit.studFname if edit else '' }}" required?>
+                </div>
+                <div class="w3-col m2">
+                    <input name="studLname" class="w3-select w3-border w3-round-large w3-padding" placeholder="Last Name" value="{{ edit.studLname if edit else '' }}" required?>
+                </div>
+                <div class="w3-col m2">
+                    <input name="studcam" class="w3-select w3-border w3-round-large w3-padding" placeholder="Campus" value="{{ edit.studcam if edit else '' }}" required?>
+                </div>
+                <div class="w3-col m2">
+                    <input name="amountPaid" class="w3-select w3-border w3-round-large w3-padding" placeholder="Amount Paid" value="{{ edit.amountPaid if edit else '' }}" required?>
+                </div>
+                <div class="w3-col m2">
+                    <button class="w3-btn w3-light-green w3-text-white w3-bold w3-round-large" style="width:180px;">
+                        {{ 'Update' if edit else 'Add' }}
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+    <table class="w3-table-all w3-hoverable w3-striped">
+        <tr class="w3-indigo">
+            <th style="width:20%;">ID</th>
+            <th style="width:20%;">Name</th>
+            <th style="width:20%;">Campus</th>
+            <th style="width:20%;">Amount Paid</th>
+            <th style="width:20%;">Actions</th>
+        </tr>
+        {% for s in students %}
+        <tr>
+            <td>{{ s.studnum }}</td>
+            <td>{{ s.studLname }}, {{ s.studFname }}</td>
+            <td>{{ s.studcam }}</td>
+            <td>{{ s.amountPaid }}</td>
+            <td>
+                <a href="/register/edit/{{ s.studnum }}" class="w3-btn w3-round-large w3-indigo">Edit</a>
+                <a href="/register/delete/{{ s.studnum }}" class="w3-btn w3-round-large w3-red">Delete</a>
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+</div>
+{% endblock %}
+
+# attendance.html --------------------------------
+{% extends 'base.html' %}
+{% block content %}
+<div>
+    <form action="/" method="get">
+        <button class="w3-btn w3-right w3-margin w3-bold w3-text-indigo">| Back to Menu</button>
+    </form>
+    <h1 class="w3-padding w3-bold w3-text-indigo">Take Attendance Here</h1>
+    {% if msg %}
+    <div class="w3-panel w3-pale-yellow w3-padding w3-margin w3-round-large w3-text-indigo">{{ msg }}</div>
+    {% endif %}
+    <div class>
+        <form action="/attendance/check" method="post">
+            <button class="w3-btn w3-right w3-magin w3-padding w3-indigo w3-round-large" style="width:250px;">Search</button>
+            <input name="studnum" class="w3-input w3-border w3-padding w3-round-large" style="width:1050px;" placeholder="Enter Student ID" required>
+            <br>
+        </form>
+    </div>
+    <table class="w3-table-all w3-hoverable w3-striped">
+        <tr class="w3-indigo">
+            <th style="width:25%;">ID</th>
+            <th style="width:25%;">Name</th>
+            <th style="width:25%;">Campus</th>
+            <th style="width:25%;">Attended?</th>
+        </tr>
+        {% for s in students %}
+        <tr>
+            <td>{{ s.studnum }}</td>
+            <td>{{ s.studLname }}, {{ s.studFname }}</td>
+            <td>{{ s.studcam }}</td>
+            <td>
+                <form action="/attendance/submit" method="post">
+                    <input type="hidden" name="studnum" value="{{ s.studnum }}">
+                    <button name="attended" value="Yes" class="w3-btn w3-green w3-round-large">Yes</button>
+                    <button name="attended" value="No" class="w3-btn w3-grey w3-text-white w3-round-large">No</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+</div>
+{% endblock %}
+
+# campus.html --------------------------------
+{% extends "base.html" %}
+{% block content %}
+
+<form action="/" method="get">
+    <button class="w3-btn w3-right w3-margin w3-bold w3-text-indigo">| Back to Menu</button>
+</form>
+<h1 class="w3-padding w3-bold w3-text-indigo">Check My Campus</h1>
+{% if result %}
+<div class="w3-panel w3-pale-green w3-padding w3-round-large w3-bold w3-text-green">
+  {{ result.studFname }} {{ result.studLname }} is from <b>{{ result.studcam }}</b> campus.
+</div>
+{% elif searched %}
+<div class="w3-panel w3-pale-red w3-padding w3-round-large w3-bold w3-text-red">ID NOT FOUND</div>
+{% endif %}
+<center>
+<div class="w3-card w3-padding w3-round-large w3-indigo" style="height:200px;">
+  <form action="/campus" method="post">
+    <br><br>
+    <input class="w3-input w3-border w3-padding w3-round-large" name="studnum" placeholder="Enter Student ID" required>
+    <br>
+    <button class="w3-btn w3-light-green w3-text-white w3-bold w3-round-large" style="width:180px;">Check</button>
+  </form>
+</div>
+</center>
+
+{% endblock %}
+
+# raffle.html --------------------------------
+{% extends 'base.html' %}
+{% block content %}
+<div>
+    <form action="/" method="get">
+        <button class="w3-btn w3-right w3-margin w3-bold w3-text-indigo">| Back to Menu</button>
+    </form>
+    <h1 class="w3-padding w3-bold w3-text-indigo">UC ICT Congress Raffle</h1>
+    <form action="/raffle" method="post">
+        <center>
+            <br><br>
+            <button class="w3-btn w3-success w3-padding-large w3-large w3-round-large w3-bold">Reveal the Lucky Winner!</button>
+        </center>
+    </form>
+    <div class="w3-card w3-padding w3-margin w3-indigo w3-round-xlarge">
+        {% if winner %}
+        <br>
+        <h1 class="w3-center w3-bold">Congratulations!</h1>
+        <table class="w3-table-all w3-hoverable w3-striped">
+            <tr class="w3-white w3-text-indigo">
+                <th>ID</th>
+                <th>Name</th>
+                <th>Campus</th>
+            </tr>
+            <tr class="w3-text-indigo">
+                <td>{{ winner.studnum }}</td>
+                <td>{{ winner.studLname }}, {{ winner.studFname }}</td>
+                <td>{{ winner.studcam }}</td>
+            </tr>
+        </table>
+        <br><br>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+# report.html --------------------------------
+{% extends "base.html" %}
+{% block content %}
+
+<form action="/" method="get">
+    <button class="w3-btn w3-right w3-margin w3-bold w3-text-indigo">| Back to Menu</button>
+</form>
+<h1 class="w3-padding w3-bold w3-text-indigo">Generate Report</h1>
+
+<div class="w3-card w3-padding w3-round-xlarge">
+    <h4 class="w3-bold w3-text-indigo">Report By Campus</h4>
+    <table class="w3-table-all w3-table-all w3-hoverable w3-striped">
+        <tr class="w3-indigo">
+            <th>Campus</th>
+            <th>Count</th>
+            <th>Attended</th>
+        </tr>
+        {% for c in campus_summary %}
+        <tr>
+            <td>{{ c.studcam }}</td>
+            <td>{{ c.count }}</td>
+            <td>{{ c.attended }}</td></tr>
+        {% endfor %}
+        <tr class="w3-light-grey">
+            <td><b>Total</b></td>
+            <td><b>{{ total_count }}</b></td>
+            <td><b>{{ total_attended }}</b></td>
+        </tr>
+    </table>
+
+    <br>
+    <h4 class="w3-bold w3-text-indigo">Detailed Table</h4>
+    <table class="w3-table-all">
+        <tr class="w3-indigo">
+            <th>ID</th>
+            <th>Name</th>  
+            <th>Campus</th>
+            <th>Attended</th>
+        </tr>
+        {% for s in students %}
+        <tr>
+            <td>{{ s.studnum }}</td>
+            <td>{{ s.studLname }}, {{ s.studFname }}</td>
+            <td>{{ s.studcam }}</td>
+            <td>{{ s.attended }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+
+    <br>
+    <h4 class="w3-bold w3-text-indigo">Summary Report (All Campuses)</h4>
+    <table class="w3-table-all">
+        <tr>
+            <td>Total Students</td>
+            <td>{{ total_count }}</td>
+        </tr>
+        <tr>
+            <td>Total Collection</td>
+            <td>{{ "%.2f"|format(total_collection) }}</td>
+        </tr>
+        <tr>
+            <td>Date Generated</td>
+            <td>{{ today }}</td>
+        </tr>
+    </table>
+</div>
+{% endblock %}
+
+
+
+
+
+
+
+
+

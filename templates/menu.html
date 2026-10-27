@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="w3-card w3-white w3-padding-32" style="max-width:400px;margin:auto">
+  <h3>Choose your Transaction</h3>
+  <form action="/go" method="get">
+    <select name="page" class="w3-select w3-border">
+      <option value="register">Register</option>
+      <option value="attendance">Attendance</option>
+      <option value="raffle">Raffle</option>
+      <option value="campus">Check My Campus</option>
+      <option value="report">Generate Report</option>
+    </select>
+    <br><br>
+    <button class="w3-btn w3-blue w3-block">Go</button>
+  </form>
+</div>
+
+{% endblock %}
